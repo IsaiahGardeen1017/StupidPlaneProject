@@ -40,7 +40,7 @@ A lightweight browser UI is now available at `ui/index.html` for single-plane op
 ### Features
 - Fly a plane with keyboard controls (`W/S`, arrow keys, `Space`, `R`)
 - Live telemetry panel (speed, altitude, climb, throttle, attitude, turn rate, AoA estimate)
-- Runtime tuning sliders for thrust, drag, lift, pitch rate, and roll rate
+- Runtime tuning sliders for thrust, drag, lift, pitch rate, and roll rate (with live numeric values)
 - Preset save/load via `localStorage` and import/export via JSON text
 
 ### Run locally

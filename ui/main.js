@@ -24,6 +24,9 @@ const plane = {
   pitch: 0,
   yaw: 0,
   roll: 0,
+  pitchRate: 0,
+  rollRate: 0,
+  yawRate: 0,
   health: 100,
   ammo: 250,
   cooldown: 0,
@@ -88,12 +91,27 @@ const binds = {
   rollRate: document.getElementById('rollRate'),
   pitchRate: document.getElementById('pitchRate'),
 };
+const bindValues = {
+  thrust: document.getElementById('thrustValue'),
+  drag: document.getElementById('dragValue'),
+  lift: document.getElementById('liftValue'),
+  rollRate: document.getElementById('rollRateValue'),
+  pitchRate: document.getElementById('pitchRateValue'),
+};
+
+function formatTuneValue(key, value) {
+  if (key === 'thrust') return value.toFixed(0);
+  if (key === 'drag') return value.toFixed(3);
+  return value.toFixed(2);
+}
 
 for (const [key, el] of Object.entries(binds)) {
   el.value = tuning[key];
   el.addEventListener('input', () => {
     tuning[key] = Number(el.value);
+    bindValues[key].textContent = formatTuneValue(key, tuning[key]);
   });
+  bindValues[key].textContent = formatTuneValue(key, tuning[key]);
 }
 
 function clamp(v, lo, hi) {
@@ -117,6 +135,7 @@ function applyPreset(next) {
     if (typeof next[key] === 'number') {
       tuning[key] = next[key];
       binds[key].value = next[key];
+      bindValues[key].textContent = formatTuneValue(key, next[key]);
     }
   }
 }
@@ -164,9 +183,8 @@ function spawnProjectile() {
   mesh.position.copy(plane.pos);
   scene.add(mesh);
 
-  const forward = new THREE.Vector3(1, 0, 0)
-    .applyEuler(new THREE.Euler(plane.pitch, plane.yaw, plane.roll, 'YXZ'))
-    .normalize();
+  const orientation = getOrientationQuaternion();
+  const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(orientation).normalize();
 
   projectiles.push({
     mesh,
@@ -176,6 +194,10 @@ function spawnProjectile() {
 
   plane.cooldown = 0.12;
   plane.ammo -= 1;
+}
+
+function getOrientationQuaternion() {
+  return new THREE.Quaternion().setFromEuler(new THREE.Euler(plane.roll, plane.yaw, plane.pitch, 'XYZ'));
 }
 
 function updateControls() {
@@ -189,21 +211,32 @@ function updateControls() {
 
   if (keys.has('ArrowUp')) control.pitch += 1;
   if (keys.has('ArrowDown')) control.pitch -= 1;
-  if (keys.has('ArrowLeft')) control.roll += 1;
-  if (keys.has('ArrowRight')) control.roll -= 1;
+  if (keys.has('ArrowLeft')) control.roll -= 1;
+  if (keys.has('ArrowRight')) control.roll += 1;
 }
 
 function updateFlight() {
   const speed = plane.vel.length();
-  const forward = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(plane.pitch, plane.yaw, plane.roll, 'YXZ'));
+  plane.pitchRate = control.pitch * tuning.pitchRate;
+  plane.rollRate = control.roll * tuning.rollRate;
+  plane.pitch += plane.pitchRate * dt;
+  plane.roll += plane.rollRate * dt;
 
-  plane.pitch += control.pitch * tuning.pitchRate * dt;
-  plane.roll += control.roll * tuning.rollRate * dt;
-  plane.yaw += plane.roll * 0.15 * dt;
+  plane.pitch = clamp(plane.pitch, -1.2, 1.2);
+  plane.roll = clamp(plane.roll, -1.4, 1.4);
+
+  plane.yawRate = Math.tan(plane.roll) * (speed / 130) * 0.35;
+  plane.yaw += plane.yawRate * dt;
+
+  const orientation = getOrientationQuaternion();
+  const forward = new THREE.Vector3(1, 0, 0).applyQuaternion(orientation);
+  const wingUp = new THREE.Vector3(0, 1, 0).applyQuaternion(orientation);
 
   const thrust = forward.clone().multiplyScalar(tuning.thrust * control.throttle);
-  const drag = plane.vel.clone().multiplyScalar(-tuning.drag);
-  const lift = new THREE.Vector3(0, tuning.lift * speed * Math.cos(plane.roll), 0);
+  const dragDirection = speed > 0.001 ? plane.vel.clone().normalize() : new THREE.Vector3(0, 0, 0);
+  const drag = dragDirection.multiplyScalar(-tuning.drag * speed * speed * 0.02);
+  const liftScale = speed < 25 ? speed / 25 : 1;
+  const lift = wingUp.multiplyScalar(tuning.lift * speed * speed * 0.004 * liftScale);
   const gravity = new THREE.Vector3(0, -9.81, 0);
 
   const accel = thrust.add(drag).add(lift).add(gravity);
@@ -232,14 +265,23 @@ function updateProjectiles() {
 }
 
 function updateCamera() {
-  const behind = new THREE.Vector3(-26, 10, 0).applyEuler(new THREE.Euler(plane.pitch, plane.yaw, plane.roll, 'YXZ'));
+  const behind = new THREE.Vector3(-26, 10, 0).applyQuaternion(getOrientationQuaternion());
   camera.position.copy(plane.pos).add(behind);
   camera.lookAt(plane.pos);
 }
 
 function updateVisuals() {
   planeMesh.position.copy(plane.pos);
-  planeMesh.rotation.set(plane.pitch, plane.yaw, plane.roll, 'YXZ');
+  planeMesh.rotation.set(plane.roll, plane.yaw, plane.pitch, 'XYZ');
+}
+
+function computeAoaDegrees() {
+  const speed = plane.vel.length();
+  if (speed < 0.001) return 0;
+  const invOrientation = getOrientationQuaternion().invert();
+  const localVelocity = plane.vel.clone().normalize().applyQuaternion(invOrientation);
+  const aoaRad = Math.atan2(localVelocity.y, Math.max(0.001, localVelocity.x));
+  return THREE.MathUtils.radToDeg(aoaRad);
 }
 
 function renderTelemetry() {
@@ -252,8 +294,9 @@ function renderTelemetry() {
     pitch: THREE.MathUtils.radToDeg(plane.pitch).toFixed(1),
     roll: THREE.MathUtils.radToDeg(plane.roll).toFixed(1),
     yaw: THREE.MathUtils.radToDeg(plane.yaw).toFixed(1),
-    turnRate: THREE.MathUtils.radToDeg(plane.roll * 0.15).toFixed(2),
-    aoaEstimate: THREE.MathUtils.radToDeg(plane.pitch).toFixed(2),
+    rollRate: THREE.MathUtils.radToDeg(plane.rollRate).toFixed(2),
+    turnRate: THREE.MathUtils.radToDeg(plane.yawRate).toFixed(2),
+    aoaEstimate: computeAoaDegrees().toFixed(2),
     ammo: plane.ammo,
     bullets: projectiles.length,
   };

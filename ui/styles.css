@@ -53,10 +53,17 @@ pre {
 
 label {
   display: grid;
-  grid-template-columns: 100px 1fr;
+  grid-template-columns: 100px 52px 1fr;
   align-items: center;
   margin-bottom: 6px;
   font-size: 13px;
+}
+
+label span {
+  text-align: right;
+  color: #a8c8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
 }
 
 input[type='range'] {
