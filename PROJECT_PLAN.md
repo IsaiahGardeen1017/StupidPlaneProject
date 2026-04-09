@@ -1,244 +1,230 @@
-# StupidPlaneProject — Feasibility & Build Plan
+# StupidPlaneProject — Project Specification
 
-## 1) Does the idea make sense?
+## 1) Purpose
 
-Yes. The concept is coherent and very feasible if you build it in phases.
+Build a browser-playable WWII-style air combat simulation where realistic-feeling aircraft behavior is the primary objective. AI neuroevolution is a later layer built on top of a validated flight/combat engine.
 
-You are combining:
-- **A physics-driven flight/combat simulator** (deterministic simulation loop)
-- **Neuroevolution training** (genetic algorithm + neural network weights)
-- **A lightweight game shell** (UI, controls, replay, save/load models)
-
-The key to success is to avoid trying to build “War Thunder lite” all at once. Start with simplified but believable physics and iterate.
+This specification is execution-focused and prioritized by implementation order.
 
 ---
 
-## 2) Recommended technical approach
+## 2) Priority Order (strict)
 
-## Core architectural split
+1. **Air combat simulation engine**
+2. **Single-plane player flight UI in open world** (for flight tuning/feel validation)
+3. **Neural training for AI flight/combat controllers**
+4. **Optional later features**: multiplayer, progression, missions, replay systems
 
-Use a 3-layer architecture:
-1. **Simulation Core** (deterministic, headless, fast)
-2. **Training Engine** (selection/evolution orchestration)
-3. **Visualization/UI** (web front end + optional player control)
-
-This lets you train at high speed without rendering, then replay best runs visually.
+Work must proceed in this order unless explicitly re-prioritized.
 
 ---
 
-## 3) Stack recommendation (best fit for your skills + web target, no-GC preference)
+## 3) Technology Stack (locked)
 
-### Recommended Stack A (strong default for your preferences)
+- **Simulation core:** C
+- **WASM toolchain:** Emscripten
+- **Web client:** TypeScript + React
+- **Rendering:** Three.js (or equivalent WebGL abstraction)
+- **Parallelism:** Web Workers for batch simulation/training jobs
 
-- **Frontend/UI:** TypeScript + React + WebGL/Three.js (or Pixi for simpler visuals)
-- **Simulation Core:** **Zig** (or C) compiled to **WebAssembly** (WASM)
-- **Training:** Runs in WASM + Web Workers for parallelism
-- **Backend (optional):** ASP.NET Core for leaderboard/model storage/job orchestration
-
-Why this stack:
-- You keep web deployment easy.
-- Zig/C are non-GC systems languages and match your preference to avoid Rust.
-- WASM still gives deterministic, high-performance browser execution.
-- TypeScript remains your control layer and UI strength.
-- C# backend is a great fit if/when you need cloud training or persistent services.
-
-### Alternative Stack B (if you want all-C#)
-
-- **Frontend:** Blazor WebAssembly or TS/React frontend
-- **Simulation/Training:** C# with .NET 8, run server-side for scale
-- **Client:** Streams state/replays
-
-Tradeoff: simpler language story, but browser-side heavy training is weaker than WASM systems-language cores for raw perf.
-
-### Tooling callout (Zig vs C in WASM)
-
-- **C + Emscripten:** most mature ecosystem, many examples, good default if you want battle-tested tooling.
-- **Zig + WASM target:** cleaner build ergonomics and modern language design, but fewer large examples than C/Emscripten.
-- If you want fastest path to production confidence today, pick **C + Emscripten**.
-
-### Avoid for v1
-
-- Complex multi-runtime architectures early (e.g., half the sim in JS, half in server, half in client). Keep one deterministic core first.
+No alternate core language is planned.
 
 ---
 
-## 4) Physics fidelity strategy
+## 4) Phase 1 — Air Combat Simulation Engine (Top Priority)
 
-Model the aircraft with “good-enough realism” first:
+## 4.1 Objectives
+- Build deterministic fixed-timestep flight/combat simulation.
+- Produce aircraft motion that feels believable and tunable.
+- Support multiple aircraft in one world with combat interactions.
 
-State per aircraft:
-- Position (x, y, z)
-- Velocity vector
-- Orientation (quaternion)
-- Angular velocity
-- Engine/throttle state
-- Damage/health/ammo
+## 4.2 Core simulation requirements
+- Fixed tick rate (default 60 Hz).
+- Deterministic update ordering.
+- Seeded RNG where randomness is used.
+- Per-aircraft state includes position, velocity, orientation, angular rates, throttle state, health, ammo.
 
-Forces/torques per tick:
+## 4.3 Flight model requirements
+Use data-driven curve/table lookup with interpolation:
 - Thrust = f(altitude, speed, throttle)
-- Drag = f(altitude, speed, AoA, flap/gear/control-surface penalties)
+- Drag = f(altitude, speed, AoA, control-surface penalties)
 - Lift = f(altitude, speed, AoA)
-- Gravity
-- Control torques (pitch/roll/yaw authority curves)
+- Control authority = f(speed, altitude)
 
-Do this as lookup curves/tables with interpolation (not huge CFD-style equations). It is easier to tune and keeps perf high.
+Implementation goal: fast, tunable, stable (not high-fidelity CFD).
 
----
+## 4.4 Combat model requirements (v1)
+- Ballistic projectiles with travel time.
+- Hit detection against aircraft collision volumes.
+- Damage model: health pool + destroy state.
+- Friendly fire behavior configurable.
 
-## 5) AI/training design (neuroevolution)
+## 4.5 Controller interface (engine contract)
+Control outputs per tick:
+- `throttle` in `[0,1]`
+- `pitch` in `[0,1]`
+- `roll` in `[0,1]`
+- `trigger` in `{0,1}`
+- No direct yaw output in v1
 
-Use **fixed-topology MLP + genetic mutations** for v1.
+Engine must accept control outputs from either human input mapping or AI policy.
 
-Inputs (example):
-- Own speed, altitude, heading, pitch/roll rates
-- Target relative bearing/elevation/range/range-rate
-- Energy state proxy
-- Ammo + health
-- Nearby threat indicators (top-N)
-
-Outputs (controller interface per tick):
-- `throttle` in `[0, 1]`
-- `pitch` in `[0, 1]` (map to control surface range internally)
-- `roll` in `[0, 1]` (map to control surface range internally)
-- `trigger` in `{0, 1}`
-- Optional `yaw` in `[0, 1]` (start without it, add only if needed)
-
-Yaw recommendation:
-- Start with **no direct yaw control** in v1 (rudder auto-coordinated via a stability helper).
-- Add explicit yaw later if you observe bad behaviors (e.g., poor gun tracking at low speed, inability to correct sideslip, weak scissors/defensive maneuvers).
-- This keeps the action space smaller for initial neuroevolution and usually trains faster.
-
-Fitness function (multi-objective weighted score):
-- Survival time
-- Kills/damage dealt
-- Damage avoided
-- Energy efficiency/flight stability penalties
-
-Evolution loop:
-1. Simulate N agents in batches
-2. Rank by fitness
-3. Keep elites
-4. Crossover + mutation on weights
-5. Repeat
-
-Start with **co-evolution in small arenas** before full “many planes in huge world.”
+## 4.6 Engine acceptance criteria
+- Stable flight for a baseline aircraft over a 60-second test run.
+- Deterministic replay of identical seed/config run.
+- 2v2 AI-vs-AI combat episode completes with valid end state.
 
 ---
 
-## 6) Determinism and reproducibility (critical)
+## 5) Phase 2 — Single-Plane Flight UI (Critical Tuning Tool)
 
-To support save/load and comparable training:
-- Fixed timestep (e.g., 30 or 60 Hz)
-- Seeded RNG everywhere
-- Deterministic math path where possible
-- Save artifacts: genome/weights, config, seed, engine version
+## 5.1 Objectives
+Provide a direct pilotable open-world mode to tune flight characteristics and identify acceptable aircraft-stat ranges.
 
-Model package format suggestion (JSON + binary weights):
-- `metadata.json` (version, topology, fitness stats)
-- `weights.bin`
-- `scenario_config.json`
+## 5.2 Required UI capabilities
+- Spawn one plane in open world.
+- Real-time control inputs mapped to engine controller interface.
+- HUD telemetry for tuning:
+  - speed, altitude, climb rate
+  - throttle value
+  - pitch/roll attitude
+  - turn rate
+  - AoA estimate
+- Runtime parameter panel for live tuning of selected aircraft curves/coefficients.
+- Reset/restart scenario controls.
 
-Replay/event stream package (for future server/multiplayer portability):
-- `events.bin` (append-only per-tick command/state delta stream)
-- `snapshots/` (periodic keyframes for fast seeking)
-- `manifest.json` (tick rate, schema version, compression format)
+## 5.3 Tuning workflow requirements
+- User can adjust flight parameters without recompiling engine.
+- User can save a tuning preset and reload it.
+- UI must expose enough telemetry to diagnose instability and “feel.”
 
----
-
-## 7) Performance + deployment plan
-
-You can scale to large plane counts if you:
-- Run **headless training** (no rendering)
-- Use **spatial partitioning** (uniform grid) for targeting/collision checks
-- Parallelize simulations via workers
-- Keep physics simple and branch-light
-
-Rule of thumb:
-- Browser-only can handle meaningful counts for prototyping.
-- Very large populations or long generations likely move to server jobs later.
-
-Design for “local now, server later” from day one:
-- Treat simulation as a pure function of `(seed, initial state, input stream)`.
-- Make the UI consume a **state/event stream API**, even when producer is local WASM.
-- Later, a remote server can publish the same stream format with minimal UI changes.
-- The same stream can be persisted as a replay file and scrubbed in a viewer.
+## 5.4 Acceptance criteria
+- Human pilot can take off/maintain controlled flight/perform turns consistently.
+- Parameter changes visibly affect behavior in expected directions.
+- Tuning presets can be exported/imported.
 
 ---
 
-## 8) Milestone roadmap
+## 6) Phase 3 — Neural Training for AI Controllers
 
-### Milestone 0 — Technical spike (1–2 weeks)
-- Fixed-step sim loop
-- One aircraft model flying stably
-- Replay viewer from saved event stream
-- Deterministic seed replay validation
+## 6.1 Objectives
+Train AI controllers that can fly and fight using the same control interface as the player mapping.
 
-### Milestone 1 — Combat sandbox (2–4 weeks)
-- 2–4 planes dogfighting
-- Gunnery/hit model
-- Basic fitness and evolution
-- Save/load best genome
+## 6.2 Training approach (v1)
+- Fixed-topology MLP controller.
+- Evolutionary optimization loop (selection + mutation/crossover).
+- Batch simulation in headless mode for throughput.
 
-### Milestone 2 — Scaled evolution (3–6 weeks)
-- Population batches
-- Parallel workers
-- UI controls for world size, plane count, time limit
-- Charts: fitness by generation
-- Stable streaming schema (works locally and over websocket/server-sent stream)
+## 6.3 Training loop
+1. Initialize population of policies.
+2. Simulate combat episodes.
+3. Score fitness.
+4. Select elites.
+5. Generate offspring.
+6. Repeat generations.
 
-### Milestone 3 — “Playable experiment” (2–4 weeks)
-- Player can spawn and fight trained agents
-- Preset aircraft archetypes
-- Export/import AI packages
-- Remote sim mode toggle (local producer vs server stream producer)
+## 6.4 Fitness system requirements
+- Fitness composition must be configurable (weights and terms).
+- Initial available terms:
+  - survival time
+  - damage dealt / kills
+  - damage taken penalty
+  - crash penalty
+- Final heuristic will be user-authored during training iteration.
 
-### Milestone 4 — Depth and polish
-- Better aircraft parameter editor
-- Team tactics behaviors
-- Optional backend training farm
+## 6.5 Model persistence
+- Save/load trained model artifacts (`metadata` + weights + scenario config).
+- Record training run metadata (seed, generation count, best score).
 
----
-
-## 9) Suggested repo structure
-
-```text
-/apps
-  /web-ui               # React/TS front end
-/packages
-  /sim-core             # Zig/C -> WASM deterministic simulator
-  /trainer              # Evolution orchestration logic
-  /shared-schema        # Scenario/model save formats
-  /stream-schema        # Event/state stream + replay format
-/services
-  /api                  # Optional ASP.NET Core service
-/docs
-  architecture.md
-  physics-model.md
-  ai-training.md
-```
+## 6.6 Acceptance criteria
+- Measurable improvement over generations in at least one benchmark scenario.
+- Saved model can be reloaded and used in a live simulation session.
 
 ---
 
-## 10) Risks and mitigations
+## 7) Phase 4 — Optional/Later Features
 
-1. **Physics too complex too early**
-   - Mitigation: table-driven curves + iterate.
-2. **Training collapse/local optima**
-   - Mitigation: novelty bonus, curriculum scenarios, periodic random immigrants.
-3. **Performance bottlenecks**
-   - Mitigation: profile early, headless mode first, spatial partitioning.
-4. **Non-deterministic runs**
-   - Mitigation: fixed timestep + seed control + replay tests in CI.
+These features are explicitly lower priority and may never be implemented:
+- Multiplayer
+- Progression systems
+- Mission framework
+- Replay productization layer
+
+No Phase 4 work begins until Phases 1–3 are functional and accepted.
 
 ---
 
-## 11) Bottom line feasibility
+## 8) Determinism and Test Requirements
 
-This project is absolutely feasible.
+## 8.1 Determinism requirements
+- Fixed timestep only.
+- Seed-controlled RNG.
+- Stable entity iteration order.
+- Versioned simulation config schema.
 
-Best path:
-- Build a deterministic sim core first.
-- Layer neuroevolution second.
-- Add web visualization and player dogfight modes third.
+## 8.2 Minimum validation suite
+- Determinism regression test (same seed/config => same output metrics).
+- Flight stability scenario test.
+- Combat episode completion test.
+- Training loop smoke test (short run).
 
-If executed incrementally, you can have a compelling prototype quickly and grow realism over time.
+---
+
+## 9) Milestones and Gates
+
+## M1 — Engine Core
+Deliver:
+- deterministic tick loop
+- aircraft state integration
+- force/torque model with curves
+- ballistic projectile combat
+
+Gate:
+- passes Phase 1 acceptance criteria.
+
+## M2 — Pilotable Open-World UI
+Deliver:
+- single-plane player mode
+- HUD telemetry
+- live parameter tuning + preset save/load
+
+Gate:
+- passes Phase 2 acceptance criteria.
+
+## M3 — AI Neuroevolution
+Deliver:
+- population training loop
+- configurable fitness terms
+- save/load trained policies
+
+Gate:
+- passes Phase 3 acceptance criteria.
+
+## M4 — Optional Feature Track
+Deliver:
+- only if approved after M1–M3 outcomes.
+
+---
+
+## 10) Immediate Execution Tasks
+
+1. Create C/Emscripten simulation core skeleton with fixed-step API.
+2. Implement baseline aircraft state integration and curve-based force model.
+3. Add ballistic projectile system and damage lifecycle.
+4. Build React + Three.js open-world single-plane UI wired to engine.
+5. Add HUD + live tuning controls + preset save/load.
+6. Add headless batch simulation path for training.
+7. Implement evolutionary trainer with configurable fitness term weights.
+8. Add model export/import and training metadata persistence.
+9. Add determinism and smoke test suite.
+
+---
+
+## 11) Definition of Done (project-level)
+
+The project reaches intended core outcome when:
+- Flight/combat simulation feels believable and tunable in player mode.
+- The same engine supports automated neuroevolution training.
+- Trained AI can be loaded and fought in-session.
+
+Everything else is optional.
