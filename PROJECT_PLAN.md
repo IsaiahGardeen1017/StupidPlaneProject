@@ -8,7 +8,7 @@ This specification is execution-focused and prioritized by implementation order.
 
 ---
 
-## 2) Priority Order (strict)
+## 2) Priority Order
 
 1. **Air combat simulation engine**
 2. **Single-plane player flight UI in open world** (for flight tuning/feel validation)
@@ -19,15 +19,12 @@ Work must proceed in this order unless explicitly re-prioritized.
 
 ---
 
-## 3) Technology Stack (locked)
+## 3) Technology Stack
 
 - **Simulation core:** C
 - **WASM toolchain:** Emscripten
 - **Web client:** TypeScript + React
-- **Rendering:** Three.js (or equivalent WebGL abstraction)
-- **Parallelism:** Web Workers for batch simulation/training jobs
-
-No alternate core language is planned.
+- **Rendering:** Three.js
 
 ---
 
@@ -49,9 +46,8 @@ Use data-driven curve/table lookup with interpolation:
 - Thrust = f(altitude, speed, throttle)
 - Drag = f(altitude, speed, AoA, control-surface penalties)
 - Lift = f(altitude, speed, AoA)
-- Control authority = f(speed, altitude)
-
-Implementation goal: fast, tunable, stable (not high-fidelity CFD).
+- RollRate = f(altitude, speed, rollInput)
+- PitchRate = f(altitude, speed, pitchInput)
 
 ## 4.4 Combat model requirements (v1)
 - Ballistic projectiles with travel time.
@@ -67,12 +63,7 @@ Control outputs per tick:
 - `trigger` in `{0,1}`
 - No direct yaw output in v1
 
-Engine must accept control outputs from either human input mapping or AI policy.
-
-## 4.6 Engine acceptance criteria
-- Stable flight for a baseline aircraft over a 60-second test run.
-- Deterministic replay of identical seed/config run.
-- 2v2 AI-vs-AI combat episode completes with valid end state.
+Engine controllers will be either players or neaural ai AI agents.
 
 ---
 
@@ -206,25 +197,3 @@ Deliver:
 
 ---
 
-## 10) Immediate Execution Tasks
-
-1. Create C/Emscripten simulation core skeleton with fixed-step API.
-2. Implement baseline aircraft state integration and curve-based force model.
-3. Add ballistic projectile system and damage lifecycle.
-4. Build React + Three.js open-world single-plane UI wired to engine.
-5. Add HUD + live tuning controls + preset save/load.
-6. Add headless batch simulation path for training.
-7. Implement evolutionary trainer with configurable fitness term weights.
-8. Add model export/import and training metadata persistence.
-9. Add determinism and smoke test suite.
-
----
-
-## 11) Definition of Done (project-level)
-
-The project reaches intended core outcome when:
-- Flight/combat simulation feels believable and tunable in player mode.
-- The same engine supports automated neuroevolution training.
-- Trained AI can be loaded and fought in-session.
-
-Everything else is optional.
