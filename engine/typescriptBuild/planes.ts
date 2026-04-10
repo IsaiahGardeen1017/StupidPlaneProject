@@ -7,7 +7,7 @@ export const planes: Record<string, PlaneStats> = {
         wingSurfaceArea: 16.2,
         parasiteDragReferenceArea: 0.3,
         parasiteDragCoefficient: 0.03,
-        thrustByAltitude: [{x: 1.2250, y: 8000}, {x: 0.905, y: 7000}],
+        thrustByAirDensity: [{x: 1.2250, y: 8000}, {x: 0.905, y: 7000}],
         AspectRatioOswaldConstant: 6.14 * 0.75
     }
 }

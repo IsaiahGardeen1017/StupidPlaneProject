@@ -22,8 +22,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+
+      - name: Verify emcc
+        run: emcc -v
+
       - name: Build and run simulation tests
         run: make test
+
+      - name: Build browser WASM module
+        run: make wasm
 
   deploy:
     needs: test
@@ -34,6 +43,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+
+      - name: Build browser WASM module
+        run: make wasm
 
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5

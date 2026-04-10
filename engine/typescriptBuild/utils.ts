@@ -33,10 +33,11 @@ export type PlaneStats = {
     parasiteDragCoefficient: number; //constant
 
     /*
-        For now we will keep thrust simple, it will only depend on altitude.  In the future we might add a speed dimension
-        Output Value is in newtons
+        Thrust is modeled as a function of air density. In engine physics we will derive
+        local air density from altitude (assuming fixed temperature) and sample this curve.
+        Output Value is in newtons.
     */
-    thrustByAltitude: Curve2D;
+    thrustByAirDensity: Curve2D;
 
     /*
         Induced drag equation
