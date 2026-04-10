@@ -10,7 +10,9 @@ extern "C" {
 
 #define SIM_MAX_AIRCRAFT 64
 #define SIM_MAX_PROJECTILES 4096
-#define SIM_CONFIG_SCHEMA_VERSION 1u
+#define SIM_MAX_PLANE_STATS 32
+#define SIM_WORLD_CONFIG_SCHEMA_VERSION 1u
+#define SIM_PLANE_STATS_SCHEMA_VERSION 1u
 
 typedef struct {
     float x;
@@ -41,6 +43,7 @@ typedef struct {
     int ammo;
     uint8_t alive;
     uint8_t team;
+    uint8_t plane_stats_index;
 } sim_aircraft;
 
 typedef struct {
@@ -73,17 +76,26 @@ typedef struct {
     float projectile_damage;
     float hit_radius;
     float gravity;
+} sim_world_config;
 
-    sim_curve thrust_by_speed;
-    sim_curve drag_by_speed;
+typedef struct {
+    uint32_t schema_version;
+    float mass_kg;
+    float wing_surface_area;
+    float parasite_drag_reference_area;
+    float parasite_drag_coefficient;
+    float aspect_ratio_oswald_constant;
+    sim_curve thrust_by_air_density;
     sim_curve lift_by_aoa;
     sim_curve roll_rate_by_input;
     sim_curve pitch_rate_by_input;
-} sim_config;
+} sim_plane_stats;
 
 typedef struct {
     uint32_t seed;
-    sim_config config;
+    sim_world_config world_config;
+    sim_plane_stats plane_stats[SIM_MAX_PLANE_STATS];
+    size_t plane_stats_count;
     sim_aircraft aircraft[SIM_MAX_AIRCRAFT];
     sim_control controls[SIM_MAX_AIRCRAFT];
     float trigger_cooldown[SIM_MAX_AIRCRAFT];
@@ -126,14 +138,30 @@ typedef struct {
     int total_ammo;
 } sim_world_metrics;
 
-void sim_default_config(sim_config *out_config);
-int sim_validate_config(const sim_config *config);
-int sim_config_serialize(const sim_config *config, char *out_buffer, size_t out_buffer_size);
-int sim_config_deserialize(sim_config *out_config, const char *serialized);
-sim_world *sim_world_create(const sim_config *config, uint32_t seed);
+void sim_default_world_config(sim_world_config *out_config);
+int sim_validate_world_config(const sim_world_config *config);
+int sim_world_config_serialize(const sim_world_config *config, char *out_buffer, size_t out_buffer_size);
+int sim_world_config_deserialize(sim_world_config *out_config, const char *serialized);
+void sim_default_plane_stats(sim_plane_stats *out_stats);
+int sim_validate_plane_stats(const sim_plane_stats *stats);
+sim_world *sim_world_create(
+    const sim_world_config *world_config,
+    const sim_plane_stats *plane_stats,
+    size_t plane_stats_count,
+    uint32_t seed);
 void sim_world_destroy(sim_world *world);
-void sim_world_reset(sim_world *world, const sim_config *config, uint32_t seed);
-void sim_world_init(sim_world *world, const sim_config *config, uint32_t seed);
+void sim_world_reset(
+    sim_world *world,
+    const sim_world_config *world_config,
+    const sim_plane_stats *plane_stats,
+    size_t plane_stats_count,
+    uint32_t seed);
+void sim_world_init(
+    sim_world *world,
+    const sim_world_config *world_config,
+    const sim_plane_stats *plane_stats,
+    size_t plane_stats_count,
+    uint32_t seed);
 int sim_spawn_aircraft(sim_world *world, const sim_aircraft *aircraft);
 void sim_set_control(sim_world *world, size_t aircraft_index, sim_control control);
 int sim_get_aircraft_telemetry(const sim_world *world, size_t aircraft_index, sim_aircraft_telemetry *out_telemetry);

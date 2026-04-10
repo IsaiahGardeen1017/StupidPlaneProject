@@ -3,22 +3,18 @@
 #include <assert.h>
 #include <stdio.h>
 
-static const sim_curve_point thrust_curve[] = {
-    {0.0f, 40.0f},
-    {120.0f, 25.0f},
-    {260.0f, 10.0f},
-};
-
-static const sim_curve_point drag_curve[] = {
-    {0.0f, 0.01f},
-    {120.0f, 0.03f},
-    {260.0f, 0.05f},
+static const sim_curve_point thrust_by_air_density_curve[] = {
+    {0.905f, 7000.0f},
+    {1.225f, 8000.0f},
 };
 
 static const sim_curve_point lift_curve[] = {
-    {-1.2f, -0.4f},
-    {0.0f, 0.0f},
-    {1.2f, 0.5f},
+    {-5.0f, 0.0f},
+    {0.0f, 0.45f},
+    {5.0f, 0.9f},
+    {10.0f, 1.35f},
+    {15.0f, 1.45f},
+    {25.0f, 0.8f},
 };
 
 static const sim_curve_point rate_curve[] = {
@@ -26,15 +22,21 @@ static const sim_curve_point rate_curve[] = {
     {1.0f, 1.4f},
 };
 
-static sim_config make_config(void) {
-    sim_config cfg;
-    sim_default_config(&cfg);
-    cfg.thrust_by_speed = (sim_curve){thrust_curve, sizeof(thrust_curve) / sizeof(thrust_curve[0])};
-    cfg.drag_by_speed = (sim_curve){drag_curve, sizeof(drag_curve) / sizeof(drag_curve[0])};
-    cfg.lift_by_aoa = (sim_curve){lift_curve, sizeof(lift_curve) / sizeof(lift_curve[0])};
-    cfg.roll_rate_by_input = (sim_curve){rate_curve, sizeof(rate_curve) / sizeof(rate_curve[0])};
-    cfg.pitch_rate_by_input = (sim_curve){rate_curve, sizeof(rate_curve) / sizeof(rate_curve[0])};
+static sim_world_config make_world_config(void) {
+    sim_world_config cfg;
+    sim_default_world_config(&cfg);
     return cfg;
+}
+
+static sim_plane_stats make_plane_stats(void) {
+    sim_plane_stats stats;
+    sim_default_plane_stats(&stats);
+    stats.thrust_by_air_density =
+        (sim_curve){thrust_by_air_density_curve, sizeof(thrust_by_air_density_curve) / sizeof(thrust_by_air_density_curve[0])};
+    stats.lift_by_aoa = (sim_curve){lift_curve, sizeof(lift_curve) / sizeof(lift_curve[0])};
+    stats.roll_rate_by_input = (sim_curve){rate_curve, sizeof(rate_curve) / sizeof(rate_curve[0])};
+    stats.pitch_rate_by_input = (sim_curve){rate_curve, sizeof(rate_curve) / sizeof(rate_curve[0])};
+    return stats;
 }
 
 static sim_aircraft make_plane(float x, float y, float z, uint8_t team) {
@@ -48,6 +50,7 @@ static sim_aircraft make_plane(float x, float y, float z, uint8_t team) {
         .ammo = 100,
         .alive = 1,
         .team = team,
+        .plane_stats_index = 0,
     };
     return a;
 }
@@ -63,12 +66,13 @@ static void run_basic_controls(sim_world *world, int ticks) {
 }
 
 static void test_determinism(void) {
-    sim_config cfg = make_config();
+    sim_world_config cfg = make_world_config();
+    sim_plane_stats stats = make_plane_stats();
     sim_world a;
     sim_world b;
 
-    sim_world_init(&a, &cfg, 12345);
-    sim_world_init(&b, &cfg, 12345);
+    sim_world_init(&a, &cfg, &stats, 1, 12345);
+    sim_world_init(&b, &cfg, &stats, 1, 12345);
 
     sim_aircraft a0 = make_plane(0, 1200, 0, 0);
     sim_aircraft a1 = make_plane(600, 1200, 0, 1);
@@ -90,9 +94,10 @@ static void test_determinism(void) {
 }
 
 static void test_projectile_damage(void) {
-    sim_config cfg = make_config();
+    sim_world_config cfg = make_world_config();
+    sim_plane_stats stats = make_plane_stats();
     sim_world w;
-    sim_world_init(&w, &cfg, 9);
+    sim_world_init(&w, &cfg, &stats, 1, 9);
 
     sim_aircraft shooter = make_plane(0, 1000, 0, 0);
     shooter.velocity.x = 0.0f;
@@ -113,22 +118,25 @@ static void test_projectile_damage(void) {
 }
 
 static void test_config_validation_and_defaults(void) {
-    sim_config cfg = make_config();
-    assert(sim_validate_config(&cfg) == 1);
+    sim_world_config cfg = make_world_config();
+    sim_plane_stats stats = make_plane_stats();
+    assert(sim_validate_world_config(&cfg) == 1);
+    assert(sim_validate_plane_stats(&stats) == 1);
 
     cfg.schema_version = 999u;
-    assert(sim_validate_config(&cfg) == 0);
+    assert(sim_validate_world_config(&cfg) == 0);
 
     sim_world w;
-    sim_world_init(&w, &cfg, 77u);
-    assert(w.config.schema_version == SIM_CONFIG_SCHEMA_VERSION);
-    assert(w.config.dt > 0.0f);
+    sim_world_init(&w, &cfg, &stats, 1, 77u);
+    assert(w.world_config.schema_version == SIM_WORLD_CONFIG_SCHEMA_VERSION);
+    assert(w.world_config.dt > 0.0f);
 }
 
 static void test_telemetry_output(void) {
-    sim_config cfg = make_config();
+    sim_world_config cfg = make_world_config();
+    sim_plane_stats stats = make_plane_stats();
     sim_world w;
-    sim_world_init(&w, &cfg, 42u);
+    sim_world_init(&w, &cfg, &stats, 1, 42u);
     sim_aircraft plane = make_plane(0.0f, 1500.0f, 0.0f, 0);
     assert(sim_spawn_aircraft(&w, &plane) == 0);
 
@@ -143,9 +151,10 @@ static void test_telemetry_output(void) {
 }
 
 static void test_world_snapshot_output(void) {
-    sim_config cfg = make_config();
+    sim_world_config cfg = make_world_config();
+    sim_plane_stats stats = make_plane_stats();
     sim_world w;
-    sim_world_init(&w, &cfg, 111u);
+    sim_world_init(&w, &cfg, &stats, 1, 111u);
     sim_aircraft a0 = make_plane(0.0f, 1400.0f, 0.0f, 0);
     sim_aircraft a1 = make_plane(200.0f, 1400.0f, 0.0f, 1);
     assert(sim_spawn_aircraft(&w, &a0) == 0);
@@ -166,27 +175,28 @@ static void test_world_snapshot_output(void) {
 }
 
 static void test_config_serialization_roundtrip(void) {
-    sim_config cfg = make_config();
+    sim_world_config cfg = make_world_config();
     cfg.friendly_fire = 1;
     cfg.world_floor_altitude = -100.0f;
 
     char serialized[512];
-    int size = sim_config_serialize(&cfg, serialized, sizeof(serialized));
+    int size = sim_world_config_serialize(&cfg, serialized, sizeof(serialized));
     assert(size > 0);
 
-    sim_config parsed;
-    assert(sim_config_deserialize(&parsed, serialized) == 0);
+    sim_world_config parsed;
+    assert(sim_world_config_deserialize(&parsed, serialized) == 0);
     assert(parsed.schema_version == cfg.schema_version);
     assert(parsed.friendly_fire == cfg.friendly_fire);
     assert(parsed.projectile_damage == cfg.projectile_damage);
     assert(parsed.world_floor_altitude == cfg.world_floor_altitude);
 
-    assert(sim_config_deserialize(&parsed, "not=a_config\n") == -1);
+    assert(sim_world_config_deserialize(&parsed, "not=a_config\n") == -1);
 }
 
 static void test_world_lifecycle_helpers(void) {
-    sim_config cfg = make_config();
-    sim_world *world = sim_world_create(&cfg, 2026u);
+    sim_world_config cfg = make_world_config();
+    sim_plane_stats stats = make_plane_stats();
+    sim_world *world = sim_world_create(&cfg, &stats, 1, 2026u);
     assert(world != NULL);
     assert(world->tick == 0);
     assert(world->seed == 2026u);
@@ -196,7 +206,7 @@ static void test_world_lifecycle_helpers(void) {
     sim_tick(world);
     assert(world->tick == 1);
 
-    sim_world_reset(world, &cfg, 4040u);
+    sim_world_reset(world, &cfg, &stats, 1, 4040u);
     assert(world->tick == 0);
     assert(world->seed == 4040u);
     assert(world->aircraft_count == 0);
@@ -205,9 +215,10 @@ static void test_world_lifecycle_helpers(void) {
 }
 
 static void test_world_metrics_output(void) {
-    sim_config cfg = make_config();
+    sim_world_config cfg = make_world_config();
+    sim_plane_stats stats = make_plane_stats();
     sim_world w;
-    sim_world_init(&w, &cfg, 55u);
+    sim_world_init(&w, &cfg, &stats, 1, 55u);
 
     sim_aircraft p0 = make_plane(0.0f, 1200.0f, 0.0f, 0);
     sim_aircraft p1 = make_plane(300.0f, 1200.0f, 0.0f, 1);

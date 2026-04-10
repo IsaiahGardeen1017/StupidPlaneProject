@@ -9,10 +9,11 @@ Initial implementation of Phase 1 simulation core in C.
 - Data-driven curve sampling with linear interpolation for thrust, drag, lift, roll rate, and pitch rate.
 - Basic combat model with ballistic projectiles, hit radius checks, health-based destruction, and optional friendly fire.
 - Deterministic hashing utility for regression tests.
-- Config schema versioning and validation entrypoints (`sim_default_config`, `sim_validate_config`).
+- World-config schema versioning and validation entrypoints (`sim_default_world_config`, `sim_validate_world_config`).
+- Per-plane stat schema/versioning and validation entrypoints (`sim_default_plane_stats`, `sim_validate_plane_stats`).
 - Aircraft telemetry extraction API for UI/HUD integration (`sim_get_aircraft_telemetry`).
 - World snapshot export helper for HUD/update loops (`sim_get_world_snapshot`).
-- Config serialization/deserialization helpers for versioned preset round-trips.
+- World-config serialization/deserialization helpers for versioned preset round-trips.
 - Lifecycle helpers (`sim_world_create`, `sim_world_reset`, `sim_world_destroy`) to simplify embedding/bindings.
 - World metrics helper (`sim_get_world_metrics`) for deterministic scenario summaries.
 
