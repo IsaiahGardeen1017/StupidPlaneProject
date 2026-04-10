@@ -56,6 +56,8 @@ This runs `engine/tests/test_sim.c`, which currently validates:
 7. Heap lifecycle helper behavior (`create/reset/destroy`)
 8. World metrics export behavior
 
+`make` is currently used for **building/running the C test binary**. If you only want to open the UI, you can skip `make` and just start a static server.
+
 ## Three.js flight tuning UI
 
 A lightweight browser UI is now available at `ui/index.html` for single-plane open-world tuning.
