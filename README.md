@@ -23,7 +23,7 @@ Initial implementation of Phase 1 simulation core in C.
 
 - A C compiler that supports C11 (`cc`, `clang`, or `gcc`)
 - `make`
-- Python 3 (only if you want to run the local UI server)
+- Node.js 22+ and npm (for the Vite React UI)
 - Emscripten (`emcc`) to build the browser WASM module that powers the React UI
 
 Install Emscripten (recommended via emsdk):
@@ -46,7 +46,7 @@ On Ubuntu/Debian:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y build-essential make python3
+sudo apt-get install -y build-essential make
 ```
 
 ### Run simulation tests
@@ -77,6 +77,7 @@ A lightweight browser UI is available at `ui/index.html` and is backed by the C 
 - Live telemetry panel (speed, altitude, climb, throttle, attitude, turn rate, AoA estimate)
 - Telemetry panel sourced from C sim state via WASM bridge
 - Keyboard control mapped to C sim controller inputs
+- Three.js-rendered world + player aircraft in the React page
 
 ### Run locally (React UI backed by C/WASM)
 
@@ -86,13 +87,15 @@ A lightweight browser UI is available at `ui/index.html` and is backed by the C 
 make wasm
 ```
 
-2) Start a static file server from repo root:
+2) Install UI dependencies and run Vite:
 
 ```bash
-python -m http.server 8080
+cd ui
+npm install
+npm run dev
 ```
 
-3) Open `http://localhost:8080/ui/`.
+3) Open the Vite URL printed in terminal (usually `http://localhost:5173`).
 
 ### Quick local workflow
 
@@ -101,12 +104,17 @@ From repo root:
 ```bash
 make test
 make wasm
-python -m http.server 8080
+cd ui
+npm install
+npm run dev
 ```
 
-Then in browser:
+For production/static output:
 
-- `http://localhost:8080/ui/`
+```bash
+cd ui
+npm run build
+```
 
 ## GitHub Actions + GitHub Pages deployment
 
