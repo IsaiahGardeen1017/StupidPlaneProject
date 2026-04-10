@@ -19,6 +19,28 @@ Initial implementation of Phase 1 simulation core in C.
 
 ## Build and test
 
+### Prerequisites
+
+- A C compiler that supports C11 (`cc`, `clang`, or `gcc`)
+- `make`
+- Python 3 (only if you want to run the local UI server)
+- Node.js is **not required yet** for the current checked-in build/test flow
+
+On macOS, install build tools with:
+
+```bash
+xcode-select --install
+```
+
+On Ubuntu/Debian:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential make python3
+```
+
+### Run simulation tests
+
 ```bash
 make test
 ```
@@ -52,6 +74,19 @@ python -m http.server 8080
 ```
 
 Then open `http://localhost:8080/ui/`.
+
+### Quick local workflow
+
+From repo root:
+
+```bash
+make test
+python -m http.server 8080
+```
+
+Then in browser:
+
+- `http://localhost:8080/ui/`
 
 ## GitHub Actions + GitHub Pages deployment
 
