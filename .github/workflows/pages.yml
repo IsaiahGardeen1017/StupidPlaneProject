@@ -22,8 +22,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+
+      - name: Verify emcc
+        run: emcc -v
+
       - name: Build and run simulation tests
         run: make test
+
+      - name: Build browser WASM module
+        run: make wasm
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm install
+
+      - name: Build UI (Vite)
+        working-directory: ui
+        run: npm run build
 
   deploy:
     needs: test
@@ -35,13 +57,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+
+      - name: Build browser WASM module
+        run: make wasm
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm install
+
+      - name: Build UI (Vite)
+        working-directory: ui
+        run: npm run build
+
       - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Upload UI as Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./ui
+          path: ./ui/dist
 
       - name: Deploy to GitHub Pages
         id: deployment

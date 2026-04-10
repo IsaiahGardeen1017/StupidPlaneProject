@@ -9,14 +9,47 @@ Initial implementation of Phase 1 simulation core in C.
 - Data-driven curve sampling with linear interpolation for thrust, drag, lift, roll rate, and pitch rate.
 - Basic combat model with ballistic projectiles, hit radius checks, health-based destruction, and optional friendly fire.
 - Deterministic hashing utility for regression tests.
-- Config schema versioning and validation entrypoints (`sim_default_config`, `sim_validate_config`).
+- World-config schema versioning and validation entrypoints (`sim_default_world_config`, `sim_validate_world_config`).
+- Per-plane stat schema/versioning and validation entrypoints (`sim_default_plane_stats`, `sim_validate_plane_stats`).
 - Aircraft telemetry extraction API for UI/HUD integration (`sim_get_aircraft_telemetry`).
 - World snapshot export helper for HUD/update loops (`sim_get_world_snapshot`).
-- Config serialization/deserialization helpers for versioned preset round-trips.
+- World-config serialization/deserialization helpers for versioned preset round-trips.
 - Lifecycle helpers (`sim_world_create`, `sim_world_reset`, `sim_world_destroy`) to simplify embedding/bindings.
 - World metrics helper (`sim_get_world_metrics`) for deterministic scenario summaries.
 
 ## Build and test
+
+### Prerequisites
+
+- A C compiler that supports C11 (`cc`, `clang`, or `gcc`)
+- `make`
+- Node.js 22+ and npm (for the Vite React UI)
+- Emscripten (`emcc`) to build the browser WASM module that powers the React UI
+
+Install Emscripten (recommended via emsdk):
+
+```bash
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk
+./emsdk install latest
+./emsdk activate latest
+source ./emsdk_env.sh
+```
+
+On macOS, install build tools with:
+
+```bash
+xcode-select --install
+```
+
+On Ubuntu/Debian:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y build-essential make
+```
+
+### Run simulation tests
 
 ```bash
 make test
@@ -33,24 +66,55 @@ This runs `engine/tests/test_sim.c`, which currently validates:
 7. Heap lifecycle helper behavior (`create/reset/destroy`)
 8. World metrics export behavior
 
-## Three.js flight tuning UI
+`make` is used for **building/running the C test binary** and for building the browser WASM module (`make wasm`).
 
-A lightweight browser UI is now available at `ui/index.html` for single-plane open-world tuning.
+## Browser flight UI (React + C/WASM)
+
+A lightweight browser UI is available at `ui/index.html` and is backed by the C simulation compiled to WASM.
 
 ### Features
 - Fly a plane with keyboard controls (`W/S`, arrow keys, `Space`, `R`)
 - Live telemetry panel (speed, altitude, climb, throttle, attitude, turn rate, AoA estimate)
-- Runtime tuning sliders for thrust, drag, lift, pitch rate, and roll rate (with live numeric values)
-- Preset save/load via `localStorage` and import/export via JSON text
+- Telemetry panel sourced from C sim state via WASM bridge
+- Keyboard control mapped to C sim controller inputs
+- Three.js-rendered world + player aircraft in the React page
 
-### Run locally
-Use any static file server from repo root (example):
+### Run locally (React UI backed by C/WASM)
+
+1) Build the WASM module:
 
 ```bash
-python -m http.server 8080
+make wasm
 ```
 
-Then open `http://localhost:8080/ui/`.
+2) Install UI dependencies and run Vite:
+
+```bash
+cd ui
+npm install
+npm run dev
+```
+
+3) Open the Vite URL printed in terminal (usually `http://localhost:5173`).
+
+### Quick local workflow
+
+From repo root:
+
+```bash
+make test
+make wasm
+cd ui
+npm install
+npm run dev
+```
+
+For production/static output:
+
+```bash
+cd ui
+npm run build
+```
 
 ## GitHub Actions + GitHub Pages deployment
 

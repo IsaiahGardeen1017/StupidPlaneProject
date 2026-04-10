@@ -3,49 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>StupidPlaneProject - Flight Tuner</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <title>StupidPlaneProject - C Sim UI</title>
   </head>
   <body>
-    <div id="app">
-      <canvas id="scene"></canvas>
-
-      <div id="overlay">
-        <section class="panel hud">
-          <h2>Telemetry</h2>
-          <pre id="telemetry">loading...</pre>
-          <p class="hint">Controls: W/S throttle, Arrow keys pitch/roll, Space fire, R reset</p>
-        </section>
-
-        <section class="panel tuning">
-          <h2>Tuning</h2>
-          <label>Thrust <span id="thrustValue">40</span>
-            <input id="thrust" type="range" min="10" max="80" step="1" value="40" />
-          </label>
-          <label>Drag <span id="dragValue">0.03</span>
-            <input id="drag" type="range" min="0.005" max="0.08" step="0.001" value="0.03" />
-          </label>
-          <label>Lift <span id="liftValue">0.5</span>
-            <input id="lift" type="range" min="0" max="1.5" step="0.01" value="0.5" />
-          </label>
-          <label>Roll Rate <span id="rollRateValue">1.4</span>
-            <input id="rollRate" type="range" min="0.2" max="3" step="0.05" value="1.4" />
-          </label>
-          <label>Pitch Rate <span id="pitchRateValue">1.4</span>
-            <input id="pitchRate" type="range" min="0.2" max="3" step="0.05" value="1.4" />
-          </label>
-
-          <div class="buttons">
-            <button id="savePreset">Save Preset</button>
-            <button id="loadPreset">Load Preset</button>
-            <button id="exportPreset">Export</button>
-            <button id="importPreset">Import</button>
-          </div>
-          <textarea id="presetText" placeholder="Exported preset JSON appears here"></textarea>
-        </section>
-      </div>
-    </div>
-
-    <script type="module" src="./main.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
