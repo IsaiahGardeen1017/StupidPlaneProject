@@ -1,5 +1,6 @@
 export async function loadSimBridge() {
-  const { default: createSimModule } = await import('/wasm/sim.js');
+  const simModuleUrl = `${import.meta.env.BASE_URL}wasm/sim.js`;
+  const { default: createSimModule } = await import(/* @vite-ignore */ simModuleUrl);
   const mod = await createSimModule();
 
   const api = {
