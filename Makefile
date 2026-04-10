@@ -7,7 +7,7 @@ WASM_SRC := engine/src/sim_wasm_api.c
 ENGINE_INC := engine/include
 TEST_SRC := engine/tests/test_sim.c
 TEST_BIN := build/test_sim
-WASM_OUT_DIR := ui/wasm
+WASM_OUT_DIR := ui/public/wasm
 WASM_JS := $(WASM_OUT_DIR)/sim.js
 
 .PHONY: all test wasm clean
